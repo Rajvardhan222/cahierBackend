@@ -7,19 +7,23 @@ const Wallet = sequelize.define("Wallet", {
     primaryKey: true,
     autoIncrement: true,
   },
-
+  name: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
   balance: { type: DataTypes.INTEGER, defaultValue: 0 },
 
   accountType: {
     type: DataTypes.STRING,
     defaultValue: "wallet",
-    validate: { isIn: [["wallet", "sbi", "hdfc", "city bank", "paytm"]] },
-    usersList: {
-      type: DataTypes.INTEGER,
-      references: {
-        Model: User,
-        key: "id",
-      },
+    validate: { isIn: [["wallet", "Bank", "UPI", "PhonePe", "paytm"]] },
+   
+  },
+  userId: {
+    type: DataTypes.INTEGER,
+    references: {
+      Model: User, 
+      key: "id",
     },
   },
 });
