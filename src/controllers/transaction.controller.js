@@ -202,52 +202,54 @@ let scheduleTransaction = asyncHandler(async (req, res) => {
     category,
     description,
     repeatFrequency,
-    repeat,
-    endAfterFrequency,
     associatedWallet,
     endAftertime,
   } = req?.body;
-  console.log(
-    amount,
-    type,
-    category,
-    description,
-    repeatFrequency,
+  let repeatDelay;
 
-    associatedWallet,
-    endAftertime
-  );
-  if (repeatFrequency == "D") {
-    repeatFrequency = 1000 * 60 * 60 * 24;
-  } else if (repeatFrequency == "W") {
-    repeatFrequency = 1000 * 60 * 60 * 24 * 7;
-  } else if (repeatFrequency == "M") {
-    repeatFrequency = 1000 * 60 * 60 * 24 * 30;
-  } else if (repeatFrequency == "Y") {
-    repeatFrequency = 1000 * 60 * 60 * 24 * 365;
+  // Calculate the repeat delay in milliseconds
+  switch (repeatFrequency) {
+    case "D":
+      repeatDelay = 1000 * 60 * 60 * 24; // 1 day
+      break;
+    case "W":
+      repeatDelay = 1000 * 60 * 60 * 24 * 7; // 1 week
+      break;
+    case "M":
+      repeatDelay = 1000 * 60 * 60 * 24 * 30; // 30 days
+      break;
+    case "Y":
+      repeatDelay = 1000 * 60 * 60 * 24 * 365; // 1 year
+      break;
+    default:
+      throw new ApiError(500, "Invalid repeat frequency");
   }
-  console.log(repeatFrequency);
-  let user = req?.user;
 
+  // Ensure required fields are provided
   if (!(amount && category && associatedWallet)) {
-    throw new ApiError(500, "amount,category and associatedWallet is required");
+    throw new ApiError(
+      500,
+      "amount, category, and associatedWallet are required"
+    );
   }
 
+  // Fetch wallet and validate ownership
   let wallet = await Wallet.findByPk(associatedWallet);
   if (!wallet) {
     throw new ApiError(500, "Invalid wallet");
   }
 
+  let user = req?.user;
   if (wallet.userId !== user.id) {
     throw new ApiError(500, "Invalid user trying to update wallet");
   }
 
+  // Create transaction
   let transaction = await Transaction.create({
     amount: parseInt(amount),
     category: category,
     description: description || "",
     associatedWallet: associatedWallet,
-
     type,
   });
 
@@ -258,59 +260,74 @@ let scheduleTransaction = asyncHandler(async (req, res) => {
     );
   }
 
-  if (type == "I") {
-    let updatedWallet = await wallet.update({
-      balance: parseInt(parseInt(wallet.balance) + parseInt(amount)),
-    });
+  // Update wallet balance
+  // if (type === "I") {
+  //   wallet.balance += parseInt(amount);
+  // } else if (type === "E") {
+  //   wallet.balance -= parseInt(amount);
+  //   if (wallet.balance < 0) {
+  //     await transaction.destroy();
+  //     throw new ApiError(500, "Insufficient balance");
+  //   }
+  // }
+  // await wallet.save();
 
-    if (!updatedWallet) {
-      transaction.destroy();
-      throw new ApiError(
-        500,
-        "Something went wrong while updating wallet in db"
-      );
-    }
-  } else if (type == "E") {
-    wallet.balance -= parseInt(amount);
-    if (wallet.balance < 0) {
-      transaction.destroy();
-      throw new ApiError(500, "Insufficient balance");
-    }
-    let updatedWallet = await wallet.save();
-  }
+  // Schedule repeating transactions
   const startTime = new Date().getTime();
   const endTime = new Date(endAftertime).getTime();
-  const options = {
-    connectionString: process.env.CONNECTION_STRING,
-  };
-  console.log(`repeat ${repeatFrequency} ,end time: ${endTime} `);
-  let interval = setInterval(() => {
-    let currentTime = new Date().getTime();
-    console.log(currentTime);
+  const options = { connectionString: process.env.CONNECTION_STRING };
+  const chunkInterval = 1000 * 60 * 60 * 24; // 1 day in milliseconds
+
+  const scheduleJob = async () => {
+    const currentTime = new Date().getTime();
     if (currentTime > endTime) {
       console.log("cleared interval");
       clearInterval(interval);
       return;
     }
-    quickAddJob(
-      options,
-      "transactionJob",
-      {
-        amount,
-        type,
-        category,
-        description,
-        associatedWallet,
-        wallet,
-        user,
-        repeat,
-        endAftertime,
-      },
-      { jobKey: `job_no_${endAfterFrequency}` }
-    );
-  }, repeatFrequency);
 
-  res.json("scheduled");
+    if ((currentTime - startTime) % repeatDelay < chunkInterval) {
+      try {
+        await quickAddJob(
+          options,
+          "transactionJob",
+          {
+            amount,
+            type,
+            category,
+            description,
+            associatedWallet,
+            wallet,
+            user,
+            endAftertime,
+          },
+          { jobKey: `job_no_${Date.now()}` }
+        );
+      } catch (error) {
+        console.error("Error in job:", error);
+      }
+    }
+  };
+
+  const interval = setInterval(scheduleJob, chunkInterval);
+
+  // Initial call to the job function to start the process immediately
+  scheduleJob();
+
+  res.json({
+    message: "Transaction scheduled",
+    data: {
+      amount,
+      type,
+      category,
+      description,
+      associatedWallet,
+      wallet,
+      user,
+      repeatFrequency,
+      endAftertime,
+    },
+  });
 });
 
 function getStartOfToday() {
@@ -407,9 +424,9 @@ const sendTransactionBetweenDate = asyncHandler(async (req, res) => {
 });
 
 const sendIncome = asyncHandler(async (req, res) => {
-  let { associatedWalletList,month } = req?.body;
- let between = getMonthStartEndTimes(month,2024)
- console.log(between);
+  let { associatedWalletList, month } = req?.body;
+  let between = getMonthStartEndTimes(month, 2024);
+  console.log(between);
   let Income = 0;
   let Expense = 0;
   const verify = await Promise.all(
@@ -475,7 +492,7 @@ function getMonthStartEndTimes(month, year) {
   };
 
   if (!months.hasOwnProperty(month)) {
-    throw new ApiError(500,"Invalid month",{month})
+    throw new ApiError(500, "Invalid month", { month });
   }
 
   const monthIndex = months[month];

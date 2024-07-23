@@ -1,8 +1,9 @@
 import  Transaction  from "../../model/transaction.model.js";
 import Wallet from "../../model/wallet.model.js";
 export default async (payload, helpers) => {
-    const { amount,type,category,description,associatedWallet ,repeat,endAftertime } = payload;
+    const { amount,type,category,description,associatedWallet ,endAftertime } = payload;
     let wallet = await Wallet.findByPk(associatedWallet);
+    console.log(amount,type,category,description,associatedWallet ,endAftertime);
     if(type == 'I'){
       let transaction = await Transaction.create({
         amount: parseInt(amount),
@@ -10,7 +11,7 @@ export default async (payload, helpers) => {
         description: description || "",
         associatedWallet: associatedWallet,
     repeat :true,
-    repeatFrequency : repeat,
+    // repeatFrequency : repeat,
     endAfterFrequency : endAftertime,
         type: "I",
       });
@@ -27,7 +28,7 @@ export default async (payload, helpers) => {
         description: description || "",
         associatedWallet: associatedWallet,
         repeat :true,
-        repeatFrequency : repeat,
+        // repeatFrequency : repeat,
         endAfterFrequency : endAftertime,
         type: "E",
       });
