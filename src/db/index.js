@@ -2,7 +2,7 @@ import { Sequelize } from "sequelize";
 import pkg from 'pg';
 const { Client } = pkg;
 const sequelize = new Sequelize(
-  `postgres://${process.env.USER}:${process.env.PASSWORD}@${process.env.HOST}:${process.env.HPORT}/cashier`,{
+  `postgres://postgres:1234@localhost:5432/cashier`,{
     logging: false
   }
 );
