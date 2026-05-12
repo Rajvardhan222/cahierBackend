@@ -245,20 +245,20 @@ let scheduleTransaction = asyncHandler(async (req, res) => {
   }
 
   // Create transaction
-  let transaction = await Transaction.create({
-    amount: parseInt(amount),
-    category: category,
-    description: description || "",
-    associatedWallet: associatedWallet,
-    type,
-  });
+  // let transaction = await Transaction.create({
+  //   amount: parseInt(amount),
+  //   category: category,
+  //   description: description || "",
+  //   associatedWallet: associatedWallet,
+  //   type,
+  // });
 
-  if (!transaction) {
-    throw new ApiError(
-      500,
-      "Something went wrong while making transaction entry in db"
-    );
-  }
+  // if (!transaction) {
+  //   throw new ApiError(
+  //     500,
+  //     "Something went wrong while making transaction entry in db"
+  //   );
+  // }
 
   // Update wallet balance
   // if (type === "I") {
@@ -425,49 +425,51 @@ const sendTransactionBetweenDate = asyncHandler(async (req, res) => {
 
 const sendIncome = asyncHandler(async (req, res) => {
   let { associatedWalletList, month } = req?.body;
-  let between = getMonthStartEndTimes(month, 2024);
-  console.log(between);
+  let between = getMonthStartEndTimes(month);
   let Income = 0;
   let Expense = 0;
-  const verify = await Promise.all(
-    associatedWalletList.map(async (walletId) => {
-      if (walletId?.userId !== req?.user.id) {
-        throw new ApiError(500, "Invalid user trying");
-      }
 
-      let incomeTransaction = await Transaction.findAll({
-        where: {
-          associatedWallet: walletId.id,
-          type: "I",
-          createdAt: {
-            [Op.gte]: between.firstDay,
-            [Op.lte]: between.lastDay,
-          },
-        },
-      });
+  const walletIds = (associatedWalletList || [])
+    .map((wallet) => (typeof wallet === "object" ? wallet.id : wallet))
+    .filter((id) => id);
 
-      let expenseTransaction = await Transaction.findAll({
-        where: {
-          associatedWallet: walletId.id,
-          type: "E",
-          createdAt: {
-            [Op.gte]: between.firstDay,
-            [Op.lte]: between.lastDay,
-          },
-        },
-      });
+  if (walletIds.length === 0) {
+    throw new ApiError(400, "No wallet ids provided");
+  }
 
-      console.log("Income and expense record , " + incomeTransaction);
-      incomeTransaction.forEach((transaction) => {
-        Income += transaction.dataValues.amount;
-      });
+  const userWallets = await Wallet.findAll({
+    where: {
+      id: { [Op.in]: walletIds },
+      userId: req?.user.id,
+    },
+    attributes: ["id"],
+  });
 
-      expenseTransaction.forEach((transaction) => {
-        Expense += transaction.dataValues.amount;
-      });
-    })
-  );
-  console.log("log of income", Income);
+  const userWalletIds = userWallets.map((wallet) => wallet.id);
+  if (userWalletIds.length === 0) {
+    throw new ApiError(400, "No valid wallets for this user");
+  }
+
+  const transactions = await Transaction.findAll({
+    where: {
+      associatedWallet: { [Op.in]: userWalletIds },
+      type: { [Op.in]: ["I", "E"] },
+      createdAt: {
+        [Op.gte]: between.firstDay,
+        [Op.lte]: between.lastDay,
+      },
+    },
+    attributes: ["type", "amount"],
+  });
+
+  transactions.forEach((transaction) => {
+    if (transaction.dataValues.type === "I") {
+      Income += transaction.dataValues.amount;
+    } else if (transaction.dataValues.type === "E") {
+      Expense += transaction.dataValues.amount;
+    }
+  });
+
   res.status(200).json(
     new ApiResponse(200, "Transaction made successfully", {
       Income,
