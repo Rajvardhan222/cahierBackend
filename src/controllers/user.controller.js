@@ -16,11 +16,12 @@ const mailjet = new Mailjet({
 });
 
 let sendOtp = async (otp, email, name) => {
+  console.log(otp,email)
   const request = mailjet.post("send", { version: "v3.1" }).request({
     Messages: [
       {
         From: {
-          Email: "rajvardhanranawat80@gmail.com",
+          Email: "rajvardhanranawat.dev@gmail.com",
           Name: "Cashier",
         },
         To: [
@@ -211,8 +212,8 @@ let loginUser = asyncHandler(async (req, res) => {
   });
   const option = {
     httpOnly: true,
-    secure: true,
-     sameSite: 'none', 
+    secure: false,
+     sameSite: 'lax', 
      
    
   };

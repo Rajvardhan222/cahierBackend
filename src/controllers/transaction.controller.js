@@ -644,6 +644,57 @@ const categoryWiseDetails = asyncHandler(async (req, res) => {
     );
 });
 
+const getTransactionById = asyncHandler(async (req, res) => {
+  const { id } = req?.body;
+
+  if (!id) {
+    throw new ApiError(400, "id is required");
+  }
+
+  const transaction = await Transaction.findByPk(id);
+  if (!transaction) {
+    throw new ApiError(404, "Transaction not found");
+  }
+
+  const wallet = await Wallet.findByPk(transaction.associatedWallet);
+  if (!wallet || wallet.userId !== req?.user.id) {
+    throw new ApiError(403, "Not authorized to view this transaction");
+  }
+
+  res.status(200).json(
+    new ApiResponse(200, "Transaction fetched successfully", {
+      transaction,
+    })
+  );
+});
+
+const getAllTransactionsAndWallets = asyncHandler(async (req, res) => {
+  const userId = req?.user?.id;
+  if (!userId) {
+    throw new ApiError(401, "Unauthorized");
+  }
+
+  const wallets = await Wallet.findAll({
+    where: { userId },
+  });
+
+  const walletIds = wallets.map((wallet) => wallet.id);
+
+  const transactions = await Transaction.findAll({
+    where: {
+      associatedWallet: { [Op.in]: walletIds },
+    },
+    order: [["createdAt", "DESC"]],
+  });
+
+  res.status(200).json(
+    new ApiResponse(200, "Transactions and wallets fetched successfully", {
+      wallets,
+      transactions,
+    })
+  );
+});
+
 export {
   makeIncome,
   makeExpense,
@@ -654,4 +705,6 @@ export {
   sendIncome,
   FilterResults,
   categoryWiseDetails,
+  getTransactionById,
+  getAllTransactionsAndWallets,
 };

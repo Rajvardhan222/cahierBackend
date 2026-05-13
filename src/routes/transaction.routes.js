@@ -4,6 +4,8 @@ import {
   FilterResults,
   categoryWiseDetails,
   getTodayTransaction,
+  getTransactionById,
+  getAllTransactionsAndWallets,
   makeExpense,
   makeIncome,
   makeTransfer,
@@ -25,5 +27,7 @@ router
 router.route("/getIncome").post(varifyJWT, sendIncome);
 router.route("/filterResult").post(varifyJWT, FilterResults);
 router.route("/categoryDetails").post(varifyJWT, categoryWiseDetails);
+router.route("/transactionById").post(varifyJWT, getTransactionById);
+router.route("/getHistory").post(varifyJWT, getAllTransactionsAndWallets);
 
 export default router;
